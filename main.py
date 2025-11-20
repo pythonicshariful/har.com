@@ -17,6 +17,9 @@ MAX_PRICE = 40000
 MAX_PAGES = 20
 ACREAGE = True
 RESIDENTIAL = True
+IP = None  # e.g., "123.45.67.89"
+PORT = None  # e.g., "8080"
+
 
 # === Setup ===
 brave_path = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
@@ -221,6 +224,8 @@ def build_browser_options(enable_exclude_switches=True):
     options.binary_location = brave_path
     options.add_argument(f"--user-data-dir={profile_path}")
     options.add_argument("--profile-directory=Default")
+    if IP and PORT:
+        options.add_argument(f"--proxy-server={IP}:{PORT}")
 
     # Advanced stealth options
     stealth_args = [
@@ -289,23 +294,39 @@ print(f"   Max pages: {MAX_PAGES}")
 url = 'https://www.har.com/'
 
 try:
-    print("Loading HAR.com with enhanced stealth...")
-    driver.get(url)
+    # print("Loading HAR.com with enhanced stealth...")
+    # driver.get(url)
     
-    human_like_delay(2, 4)
-    human_like_scroll(driver)
-    human_like_delay(1, 2)
+    # human_like_delay(2, 4)
+    # try: 
+    #     confirm_button = driver.find_element(By.CSS_SELECTOR,'button[aria-label="Confirm"]')
+    #     confirm_button.click()
+    #     human_like_delay(1, 2)
+    #     print("Clicked 'Confirm' button successfully.")
+    # except Exception as e:
+    #     pass
+    # human_like_scroll(driver)
+    # human_like_delay(1, 2)
     
     print("Page should be loaded. Check for CAPTCHA...")
 
     # Click More Filters    
-    more_filters = driver.find_element(By.XPATH, "//a[text()='More Filters']")
-    more_filters.click()
+    # more_filters = driver.find_element(By.XPATH, "//a[text()='More Filters']")
+    # more_filters.click()
+    # human_like_delay(2, 4)
+    # print("Clicked 'More Filters' successfully.")
+    driver.get('https://www.har.com/search/dosearch?for_sale=1&view=map&showform=1')
     human_like_delay(2, 4)
-    print("Clicked 'More Filters' successfully.")
-    
+    print("Navigated to 'https://www.har.com/search/dosearch?for_sale=1&view=map&showform=1' successfully.")
     human_like_scroll(driver)
     human_like_delay(1, 2)
+    try: 
+        confirm_button = driver.find_element(By.CSS_SELECTOR,'button[aria-label="Confirm"]')
+        confirm_button.click()
+        human_like_delay(1, 2)
+        print("Clicked 'Confirm' button successfully.")
+    except Exception as e:
+        pass
     
     # Select county from config
     wait = WebDriverWait(driver, 10)
