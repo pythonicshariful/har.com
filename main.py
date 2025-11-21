@@ -11,20 +11,22 @@ from selenium.common.exceptions import (
 import json
 import os
 import undetected_chromedriver as uc
-#===filters===
-COUNTY = "Montgomery"
-MAX_PRICE = 40000
-MAX_PAGES = 20
-ACREAGE = True
-RESIDENTIAL = True
-IP = None  # e.g., "123.45.67.89"
-PORT = None  # e.g., "8080"
+# === Default configuration ===
+DEFAULT_FILTERS = {
+    "county": "Montgomery",
+    "max_price": 40000,
+    "max_pages": 20,
+    "acreage": True,
+    "residential": True,
+}
 
-
-# === Setup ===
-brave_path = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
-profile_path = r"C:\Users\pytho\AppData\Local\BraveSoftware\Brave-Browser\User Data"
-chromedriver_path = "chromedriver.exe"
+DEFAULT_BROWSER_SETTINGS = {
+    "brave_binary": r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
+    "profile_dir": r"C:\Users\pytho\AppData\Local\BraveSoftware\Brave-Browser\User Data",
+    "chromedriver_path": "chromedriver.exe",
+    "ip": None,
+    "port": None,
+}
 
 def human_like_delay(min_seconds=1, max_seconds=3):
     """Add random delay to simulate human behavior"""
@@ -219,13 +221,19 @@ def get_current_page_number(driver):
 
 
 
-def build_browser_options(enable_exclude_switches=True):
+def build_browser_options(
+    brave_binary,
+    profile_dir,
+    ip=None,
+    port=None,
+    enable_exclude_switches=True,
+):
     options = uc.ChromeOptions()
-    options.binary_location = brave_path
-    options.add_argument(f"--user-data-dir={profile_path}")
+    options.binary_location = brave_binary
+    options.add_argument(f"--user-data-dir={profile_dir}")
     options.add_argument("--profile-directory=Default")
-    if IP and PORT:
-        options.add_argument(f"--proxy-server={IP}:{PORT}")
+    if ip and port:
+        options.add_argument(f"--proxy-server={ip}:{port}")
 
     # Advanced stealth options
     stealth_args = [
@@ -259,222 +267,245 @@ def build_browser_options(enable_exclude_switches=True):
     return options
 
 
-def start_driver(enable_exclude_switches=True):
-    options = build_browser_options(enable_exclude_switches)
+def start_driver(
+    brave_binary,
+    profile_dir,
+    chromedriver_path,
+    ip=None,
+    port=None,
+    enable_exclude_switches=True,
+):
+    options = build_browser_options(
+        brave_binary=brave_binary,
+        profile_dir=profile_dir,
+        ip=ip,
+        port=port,
+        enable_exclude_switches=enable_exclude_switches,
+    )
     return uc.Chrome(
         driver_executable_path=chromedriver_path,
         options=options,
-        browser_executable_path=brave_path,
+        browser_executable_path=brave_binary,
     )
 
+def scrape_har_properties(
+    county=None,
+    max_price=None,
+    max_pages=None,
+    acreage=None,
+    residential=None,
+    ip=None,
+    port=None,
+    output_filename="har_properties_all_pages.json",
+    brave_binary=None,
+    profile_dir=None,
+    chromedriver_path=None,
+    reuse_existing_progress=True,
+):
+    """
+    Run the HAR property scraper with runtime configuration.
 
-try:
-    driver = start_driver()
-except InvalidArgumentException as e:
-    if "excludeSwitches" in str(e):
-        print("⚠️ Driver rejected excludeSwitches. Retrying without them...")
-        driver = start_driver(enable_exclude_switches=False)
-    else:
-        raise
+    Returns:
+        list[dict]: Collected property data.
+    """
+    filters = {
+        "county": county or DEFAULT_FILTERS["county"],
+        "max_price": DEFAULT_FILTERS["max_price"] if max_price is None else max_price,
+        "max_pages": DEFAULT_FILTERS["max_pages"] if max_pages is None else max_pages,
+        "acreage": DEFAULT_FILTERS["acreage"] if acreage is None else acreage,
+        "residential": DEFAULT_FILTERS["residential"] if residential is None else residential,
+    }
 
-# Remove webdriver property
-driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    browser_settings = {
+        "brave_binary": brave_binary or DEFAULT_BROWSER_SETTINGS["brave_binary"],
+        "profile_dir": profile_dir or DEFAULT_BROWSER_SETTINGS["profile_dir"],
+        "chromedriver_path": chromedriver_path or DEFAULT_BROWSER_SETTINGS["chromedriver_path"],
+        "ip": DEFAULT_BROWSER_SETTINGS["ip"] if ip is None else ip,
+        "port": DEFAULT_BROWSER_SETTINGS["port"] if port is None else port,
+    }
 
-# Override permissions
-driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-    "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-})
-
-# === Load configuration ===
-print(f"📋 Configuration loaded:")
-print(f"   County: {COUNTY}")
-print(f"   Max pages: {MAX_PAGES}")
-
-# === Navigate with human-like behavior ===
-url = 'https://www.har.com/'
-
-try:
-    # print("Loading HAR.com with enhanced stealth...")
-    # driver.get(url)
-    
-    # human_like_delay(2, 4)
-    # try: 
-    #     confirm_button = driver.find_element(By.CSS_SELECTOR,'button[aria-label="Confirm"]')
-    #     confirm_button.click()
-    #     human_like_delay(1, 2)
-    #     print("Clicked 'Confirm' button successfully.")
-    # except Exception as e:
-    #     pass
-    # human_like_scroll(driver)
-    # human_like_delay(1, 2)
-    
-    print("Page should be loaded. Check for CAPTCHA...")
-
-    # Click More Filters    
-    # more_filters = driver.find_element(By.XPATH, "//a[text()='More Filters']")
-    # more_filters.click()
-    # human_like_delay(2, 4)
-    # print("Clicked 'More Filters' successfully.")
-    driver.get('https://www.har.com/search/dosearch?for_sale=1&view=map&showform=1')
-    human_like_delay(2, 4)
-    print("Navigated to 'https://www.har.com/search/dosearch?for_sale=1&view=map&showform=1' successfully.")
-    human_like_scroll(driver)
-    human_like_delay(1, 2)
-    try: 
-        confirm_button = driver.find_element(By.CSS_SELECTOR,'button[aria-label="Confirm"]')
-        confirm_button.click()
-        human_like_delay(1, 2)
-        print("Clicked 'Confirm' button successfully.")
-    except Exception as e:
-        pass
-    
-    # Select county from config
-    wait = WebDriverWait(driver, 10)
-    dropdown = wait.until(EC.presence_of_element_located((By.ID, "fips_code_id")))
-    select = Select(dropdown)
-    select.select_by_visible_text(COUNTY)
-    human_like_delay(2, 4)
-    print(f"Selected '{COUNTY}' from the dropdown.")
-    
-    human_like_scroll(driver)
-
-    if MAX_PRICE:
-        try:
-            price_max_dropdown = wait.until(EC.presence_of_element_located((By.ID, "listing_price_max_id")))
-            price_select = Select(price_max_dropdown)
-            price_select.select_by_value(str(MAX_PRICE))
-            human_like_delay(2, 4)
-            print(f"Selected '${MAX_PRICE}' as maximum price.")
-        except Exception as e:
-            print(f"Error selecting maximum price: {e}")
-    if ACREAGE:
-        try:
-            acreage = driver.find_element(By.XPATH,"//label[@for='customCheckDisabled3']")
-            acreage.click()
-            human_like_delay(1, 2)
-            print(f"Selected 'Acreage' checkbox.")
-        except Exception as e:
-            print(f"Error selecting acreage checkbox: {e}")
-    if RESIDENTIAL:
-        try:
-            residential = driver.find_element(By.XPATH,"//label[@for='customCheckDisabled5']")
-            residential.click()
-            human_like_delay(1, 2)
-            print(f"Selected 'Residential' checkbox.")
-        except Exception as e:
-            print(f"Error selecting residential checkbox: {e}")
-
-
-
-    
-    # Click Search
-    search_btn = driver.find_element(By.XPATH, "//button[text()='Search']")
-    search_btn.click()
-    human_like_delay(3, 5)
-    print("Clicked 'Search' button successfully.")
-    
-    # Wait for search results to load
-    human_like_delay(3, 5)
-    human_like_scroll(driver)
-    
-    # Initialize data collection
+    driver = None
     all_properties = []
-    output_filename = 'har_properties_all_pages.json'
-    
-    # Load existing progress if any
-    if os.path.exists(output_filename):
+
+    def maybe_save(data):
+        if output_filename:
+            save_progress(data, output_filename)
+
+    try:
         try:
-            with open(output_filename, 'r', encoding='utf-8') as f:
-                all_properties = json.load(f)
-            print(f"📁 Loaded existing progress: {len(all_properties)} properties")
-        except:
-            print("🆕 Starting fresh data collection")
-    
-    current_page = get_current_page_number(driver)
-    
-    while current_page <= MAX_PAGES:
-        print(f"\n{'='*60}")
-        print(f"📄 PROCESSING PAGE {current_page}")
-        print(f"{'='*60}")
-        
-        # Wait for page to load completely
+            driver = start_driver(**browser_settings)
+        except InvalidArgumentException as e:
+            if "excludeSwitches" in str(e):
+                print("⚠️ Driver rejected excludeSwitches. Retrying without them...")
+                driver = start_driver(
+                    enable_exclude_switches=False,
+                    **browser_settings,
+                )
+            else:
+                raise
+
+        driver.execute_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        )
+        driver.execute_cdp_cmd(
+            "Network.setUserAgentOverride",
+            {
+                "userAgent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            },
+        )
+
+        print("📋 Configuration loaded:")
+        print(f"   County: {filters['county']}")
+        print(f"   Max pages: {filters['max_pages']}")
+
+        driver.get("https://www.har.com/search/dosearch?for_sale=1&view=map&showform=1")
         human_like_delay(2, 4)
+        print("Navigated to 'https://www.har.com/search/dosearch?for_sale=1&view=map&showform=1' successfully.")
         human_like_scroll(driver)
-        
-        # Extract property data from current page
-        boxes = driver.find_elements(By.CSS_SELECTOR, "[id^='card_']")
-        
-        if not boxes:
-            print("❌ No property cards found on this page. Stopping.")
-            break
-        
-        print(f"Found {len(boxes)} result boxes on page {current_page}.")
-        
-        page_properties = []
-        
-        for index, box in enumerate(boxes):
-            print(f"--- Processing property {index + 1} of {len(boxes)} on page {current_page} ---")
-            
-            property_data = extract_property_data(box)
-            page_properties.append(property_data)
-            
-            # Print brief info
-            print(f"✓ {property_data['address'].split(',')[0]} - {property_data['price']}")
-            
-            # Small delay between processing each property
+        human_like_delay(1, 2)
+        try:
+            confirm_button = driver.find_element(By.CSS_SELECTOR, 'button[aria-label="Confirm"]')
+            confirm_button.click()
             human_like_delay(1, 2)
-        
-        # Add page properties to main list
-        all_properties.extend(page_properties)
-        
-        # Save progress after each page
-        save_progress(all_properties, output_filename)
-        
-        print(f"✅ Page {current_page} completed: {len(page_properties)} properties")
-        print(f"📊 Total so far: {len(all_properties)} properties")
-        
-        # Check if there's a next page
-        if current_page >= MAX_PAGES:
-            print("🔚 Reached maximum page limit")
-            break
-            
-        if not has_next_page(driver):
-            print("🎉 No more pages available. Data collection complete!")
-            break
-        
-        # Go to next page by clicking the next button
-        if not go_to_next_page(driver):
-            print("❌ Failed to navigate to next page. Stopping.")
-            break
-        
-        # Update current page number
-        current_page = get_current_page_number(driver)
-        
-        # Additional delay between pages
+            print("Clicked 'Confirm' button successfully.")
+        except Exception:
+            pass
+
+        wait = WebDriverWait(driver, 10)
+        dropdown = wait.until(EC.presence_of_element_located((By.ID, "fips_code_id")))
+        select = Select(dropdown)
+        select.select_by_visible_text(filters["county"])
         human_like_delay(2, 4)
-    
-    # Final save
-    save_progress(all_properties, output_filename)
-    
-    print(f"\n🎉 DATA COLLECTION COMPLETE!")
-    print(f"📁 Final file: {output_filename}")
-    print(f"📊 Total properties collected: {len(all_properties)}")
-    print(f"🔢 Pages processed: {current_page}")
-    
-    # Display final summary
-    properties_with_acres = len([p for p in all_properties if p['acres'] != 'N/A'])
-    print(f"🏡 Properties with acres calculated: {properties_with_acres}")
-    
-    input("Press Enter to close the browser...")
-    
-except Exception as e:
-    print(f"Error: {e}")
-    import traceback
-    traceback.print_exc()
-    
-    # Save whatever data we have on error
-    if 'all_properties' in locals():
-        save_progress(all_properties, output_filename)
-        print(f"💾 Progress saved despite error: {len(all_properties)} properties")
-finally:
-    driver.quit()
+        print(f"Selected '{filters['county']}' from the dropdown.")
+
+        human_like_scroll(driver)
+
+        if filters["max_price"]:
+            try:
+                price_max_dropdown = wait.until(
+                    EC.presence_of_element_located((By.ID, "listing_price_max_id"))
+                )
+                price_select = Select(price_max_dropdown)
+                price_select.select_by_value(str(filters["max_price"]))
+                human_like_delay(2, 4)
+                print(f"Selected '${filters['max_price']}' as maximum price.")
+            except Exception as e:
+                print(f"Error selecting maximum price: {e}")
+        if filters["acreage"]:
+            try:
+                acreage_checkbox = driver.find_element(By.XPATH, "//label[@for='customCheckDisabled3']")
+                acreage_checkbox.click()
+                human_like_delay(1, 2)
+                print("Selected 'Acreage' checkbox.")
+            except Exception as e:
+                print(f"Error selecting acreage checkbox: {e}")
+        if filters["residential"]:
+            try:
+                residential_checkbox = driver.find_element(By.XPATH, "//label[@for='customCheckDisabled5']")
+                residential_checkbox.click()
+                human_like_delay(1, 2)
+                print("Selected 'Residential' checkbox.")
+            except Exception as e:
+                print(f"Error selecting residential checkbox: {e}")
+
+        search_btn = driver.find_element(By.XPATH, "//button[text()='Search']")
+        search_btn.click()
+        human_like_delay(3, 5)
+        print("Clicked 'Search' button successfully.")
+
+        human_like_delay(3, 5)
+        human_like_scroll(driver)
+
+        if output_filename and reuse_existing_progress and os.path.exists(output_filename):
+            try:
+                with open(output_filename, "r", encoding="utf-8") as f:
+                    all_properties = json.load(f)
+                print(f"📁 Loaded existing progress: {len(all_properties)} properties")
+            except Exception:
+                print("🆕 Starting fresh data collection")
+
+        current_page = get_current_page_number(driver)
+
+        while current_page <= filters["max_pages"]:
+            print(f"\n{'='*60}")
+            print(f"📄 PROCESSING PAGE {current_page}")
+            print(f"{'='*60}")
+
+            human_like_delay(2, 4)
+            human_like_scroll(driver)
+
+            boxes = driver.find_elements(By.CSS_SELECTOR, "[id^='card_']")
+
+            if not boxes:
+                print("❌ No property cards found on this page. Stopping.")
+                break
+
+            print(f"Found {len(boxes)} result boxes on page {current_page}.")
+
+            page_properties = []
+
+            for index, box in enumerate(boxes):
+                print(f"--- Processing property {index + 1} of {len(boxes)} on page {current_page} ---")
+
+                property_data = extract_property_data(box)
+                page_properties.append(property_data)
+
+                print(f"✓ {property_data['address'].split(',')[0]} - {property_data['price']}")
+
+                human_like_delay(1, 2)
+
+            all_properties.extend(page_properties)
+
+            maybe_save(all_properties)
+
+            print(f"✅ Page {current_page} completed: {len(page_properties)} properties")
+            print(f"📊 Total so far: {len(all_properties)} properties")
+
+            if current_page >= filters["max_pages"]:
+                print("🔚 Reached maximum page limit")
+                break
+
+            if not has_next_page(driver):
+                print("🎉 No more pages available. Data collection complete!")
+                break
+
+            if not go_to_next_page(driver):
+                print("❌ Failed to navigate to next page. Stopping.")
+                break
+
+            current_page = get_current_page_number(driver)
+            human_like_delay(2, 4)
+
+        maybe_save(all_properties)
+
+        print(f"\n🎉 DATA COLLECTION COMPLETE!")
+        if output_filename:
+            print(f"📁 Final file: {output_filename}")
+        print(f"📊 Total properties collected: {len(all_properties)}")
+        print(f"🔢 Pages processed: {current_page}")
+        properties_with_acres = len([p for p in all_properties if p["acres"] != "N/A"])
+        print(f"🏡 Properties with acres calculated: {properties_with_acres}")
+
+        return all_properties
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+        if all_properties:
+            maybe_save(all_properties)
+            print(f"💾 Progress saved despite error: {len(all_properties)} properties")
+        raise
+    finally:
+        if driver:
+            driver.quit()
+
+
+if __name__ == "__main__":
+    scrape_har_properties()
